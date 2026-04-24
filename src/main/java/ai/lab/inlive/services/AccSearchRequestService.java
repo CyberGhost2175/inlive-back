@@ -3,11 +3,14 @@ package ai.lab.inlive.services;
 import ai.lab.inlive.dto.request.AccSearchRequestCreateRequest;
 import ai.lab.inlive.dto.request.AccSearchRequestUpdatePriceRequest;
 import ai.lab.inlive.dto.response.AccSearchRequestResponse;
+import ai.lab.inlive.dto.response.AccommodationUnitResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 public interface AccSearchRequestService {
     void createSearchRequest(AccSearchRequestCreateRequest request, String authorId);
+
+    Page<AccommodationUnitResponse> searchAvailableUnits(AccSearchRequestCreateRequest request, Pageable pageable);
 
     AccSearchRequestResponse getSearchRequestById(Long id);
 

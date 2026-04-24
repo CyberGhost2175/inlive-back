@@ -3,6 +3,9 @@ package ai.lab.inlive.services.impl;
 import ai.lab.inlive.dto.request.AccSearchRequestCreateRequest;
 import ai.lab.inlive.dto.request.AccSearchRequestUpdatePriceRequest;
 import ai.lab.inlive.dto.response.AccSearchRequestResponse;
+import ai.lab.inlive.dto.response.AccommodationUnitResponse;
+import ai.lab.inlive.mappers.AccommodationUnitMapper;
+import ai.lab.inlive.mappers.ImageMapper;
 import ai.lab.inlive.entities.*;
 import ai.lab.inlive.entities.enums.DictionaryKey;
 import ai.lab.inlive.entities.enums.SearchRequestStatus;
@@ -45,6 +48,8 @@ public class AccSearchRequestServiceImpl implements AccSearchRequestService {
     private final AccommodationUnitRepository accommodationUnitRepository;
     private final ReservationRepository reservationRepository;
     private final AccSearchRequestMapper accSearchRequestMapperImpl;
+    private final AccommodationUnitMapper accommodationUnitMapper;
+    private final ImageMapper imageMapper;
     private final MessageSource messageSource;
 
     @Override
@@ -180,6 +185,120 @@ public class AccSearchRequestServiceImpl implements AccSearchRequestService {
         saved = accSearchRequestRepository.save(saved);
 
         log.info("Successfully created search request with ID: {} for user: {}", saved.getId(), authorId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<AccommodationUnitResponse> searchAvailableUnits(AccSearchRequestCreateRequest request, Pageable pageable) {
+        log.info("Public search for available units");
+
+        LocalDateTime checkInDateTime = request.getCheckInDate().atTime(12, 0);
+        LocalDateTime checkOutDateTime;
+
+        if (Boolean.TRUE.equals(request.getOneNight())) {
+            checkOutDateTime = request.getCheckInDate().plusDays(1).atTime(12, 0);
+        } else {
+            if (request.getCheckOutDate() == null) {
+                throw new IllegalArgumentException(
+                        messageSource.getMessage("services.searchRequest.checkoutDateRequired", null, LocaleContextHolder.getLocale()));
+            }
+            checkOutDateTime = request.getCheckOutDate().atTime(12, 0);
+        }
+
+        if (checkOutDateTime.isBefore(checkInDateTime) || checkOutDateTime.isEqual(checkInDateTime)) {
+            throw new IllegalArgumentException(
+                    messageSource.getMessage("services.searchRequest.invalidDates", null, LocaleContextHolder.getLocale()));
+        }
+
+        Set<Long> districtIds = new HashSet<>(request.getDistrictIds());
+
+        List<Dictionary> services = new ArrayList<>();
+        if (request.getServiceDictionaryIds() != null) {
+            for (Long serviceId : request.getServiceDictionaryIds()) {
+                Dictionary service = dictionaryRepository.findByIdAndIsDeletedFalse(serviceId)
+                        .orElseThrow(() -> new DbObjectNotFoundException(HttpStatus.NOT_FOUND,
+                                "DICTIONARY_NOT_FOUND",
+                                messageSource.getMessage("services.searchRequest.dictionaryNotFound",
+                                        new Object[]{serviceId}, LocaleContextHolder.getLocale())));
+                if (service.getKey() != DictionaryKey.ACC_SERVICE) {
+                    throw new IllegalArgumentException(
+                            messageSource.getMessage("services.searchRequest.invalidDictionaryKey",
+                                    new Object[]{serviceId, "ACC_SERVICE"}, LocaleContextHolder.getLocale()));
+                }
+                services.add(service);
+            }
+        }
+
+        List<Dictionary> conditions = new ArrayList<>();
+        if (request.getConditionDictionaryIds() != null) {
+            for (Long conditionId : request.getConditionDictionaryIds()) {
+                Dictionary condition = dictionaryRepository.findByIdAndIsDeletedFalse(conditionId)
+                        .orElseThrow(() -> new DbObjectNotFoundException(HttpStatus.NOT_FOUND,
+                                "DICTIONARY_NOT_FOUND",
+                                messageSource.getMessage("services.searchRequest.dictionaryNotFound",
+                                        new Object[]{conditionId}, LocaleContextHolder.getLocale())));
+                if (condition.getKey() != DictionaryKey.ACC_CONDITION) {
+                    throw new IllegalArgumentException(
+                            messageSource.getMessage("services.searchRequest.invalidDictionaryKey",
+                                    new Object[]{conditionId, "ACC_CONDITION"}, LocaleContextHolder.getLocale()));
+                }
+                conditions.add(condition);
+            }
+        }
+
+        List<AccommodationUnit> allUnits = accommodationUnitRepository.findAll();
+        List<AccommodationUnitResponse> result = new ArrayList<>();
+
+        for (AccommodationUnit unit : allUnits) {
+            if (unit.getIsDeleted() || !unit.getIsAvailable()) continue;
+
+            Accommodation acc = unit.getAccommodation();
+            if (acc.getIsDeleted()) continue;
+
+            if (!request.getUnitTypes().contains(unit.getUnitType())) continue;
+            if (!districtIds.contains(acc.getDistrict().getId())) continue;
+
+            if (request.getFromRating() != null && acc.getRating() < request.getFromRating()) continue;
+            if (request.getToRating() != null && acc.getRating() > request.getToRating()) continue;
+
+            if (unit.getCapacity() < request.getCountOfPeople()) continue;
+
+            if (!services.isEmpty()) {
+                Set<Long> unitServiceIds = unit.getDictionaries().stream()
+                        .filter(d -> d.getDictionary().getKey() == DictionaryKey.ACC_SERVICE)
+                        .map(d -> d.getDictionary().getId())
+                        .collect(Collectors.toSet());
+                if (services.stream().anyMatch(s -> !unitServiceIds.contains(s.getId()))) continue;
+            }
+
+            if (!conditions.isEmpty()) {
+                Set<Long> unitConditionIds = unit.getDictionaries().stream()
+                        .filter(d -> d.getDictionary().getKey() == DictionaryKey.ACC_CONDITION)
+                        .map(d -> d.getDictionary().getId())
+                        .collect(Collectors.toSet());
+                if (conditions.stream().anyMatch(c -> !unitConditionIds.contains(c.getId()))) continue;
+            }
+
+            if (request.getPrice() != null && !unit.getTariffs().isEmpty()) {
+                Double minPrice = unit.getTariffs().stream()
+                        .map(AccUnitTariffs::getPrice)
+                        .min(Double::compareTo)
+                        .orElse(null);
+                if (minPrice != null && minPrice > request.getPrice()) continue;
+            }
+
+            if (reservationRepository.isUnitReservedForPeriod(unit.getId(), checkInDateTime, checkOutDateTime)) continue;
+
+            result.add(accommodationUnitMapper.toDto(unit, imageMapper));
+        }
+
+        log.info("Public search found {} matching units", result.size());
+
+        int start = (int) pageable.getOffset();
+        int end = Math.min(start + pageable.getPageSize(), result.size());
+        List<AccommodationUnitResponse> pageContent = (start >= result.size()) ? List.of() : result.subList(start, end);
+
+        return new PageImpl<>(pageContent, pageable, result.size());
     }
 
     private LocalDateTime calculateExpirationTime(LocalDateTime checkInDate) {

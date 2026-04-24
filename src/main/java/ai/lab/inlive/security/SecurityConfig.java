@@ -38,6 +38,7 @@ public class SecurityConfig {
             "/webjars/**",
             "/auth/**",
             "/actuator/**",
+            "/search-requests/search",
     };
     @Value("${spring.application.client-id}")
     private String clientId;

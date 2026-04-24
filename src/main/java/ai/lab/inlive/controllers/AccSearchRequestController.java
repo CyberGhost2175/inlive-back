@@ -5,6 +5,7 @@ import ai.lab.inlive.dto.base.PaginatedResponse;
 import ai.lab.inlive.dto.request.AccSearchRequestCreateRequest;
 import ai.lab.inlive.dto.request.AccSearchRequestUpdatePriceRequest;
 import ai.lab.inlive.dto.response.AccSearchRequestResponse;
+import ai.lab.inlive.dto.response.AccommodationUnitResponse;
 import ai.lab.inlive.security.authorization.AccessForAdminsAndClients;
 import ai.lab.inlive.services.AccSearchRequestService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -151,5 +152,25 @@ public class AccSearchRequestController {
 
         accSearchRequestService.cancelSearchRequest(id, authorId);
         return ResponseEntity.noContent().build();
+    }
+
+    @Operation(summary = "Поиск доступных вариантов жилья (публичный)",
+            description = "Поиск доступных единиц размещения по заданным параметрам.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Список доступных вариантов жилья"),
+            @ApiResponse(responseCode = "400", description = "Некорректные параметры поиска", content = @Content)
+    })
+    @PostMapping(value = "/search", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<PaginatedResponse<AccommodationUnitResponse>> searchAvailableUnits(
+            @RequestBody @Valid AccSearchRequestCreateRequest request,
+            @Parameter(description = "Номер страницы (начиная с 0)") @RequestParam(defaultValue = "0") Integer page,
+            @Parameter(description = "Размер страницы") @RequestParam(defaultValue = "20") Integer size,
+            @Parameter(description = "Поле для сортировки") @RequestParam(defaultValue = "id") String sortBy,
+            @Parameter(description = "Направление сортировки (asc/desc)") @RequestParam(defaultValue = "asc") String sortDirection) {
+        Pageable pageable = PageRequest.of(
+                page, size,
+                Sort.by("desc".equalsIgnoreCase(sortDirection) ? Sort.Order.desc(sortBy) : Sort.Order.asc(sortBy))
+        );
+        return ResponseEntity.ok(new PaginatedResponse<>(accSearchRequestService.searchAvailableUnits(request, pageable)));
     }
 }
