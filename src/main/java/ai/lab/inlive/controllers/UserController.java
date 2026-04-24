@@ -111,5 +111,23 @@ public class UserController {
         userService.deleteUserPhoto(keycloakId);
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
+
+    @Operation(summary = "Удалить свой аккаунт",
+            description = "Удаление текущего авторизованного пользователя. Аккаунт деактивируется и удаляется из Keycloak.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "204", description = "Аккаунт успешно удалён", content = @Content),
+            @ApiResponse(responseCode = "401", description = "Пользователь не авторизован", content = @Content),
+            @ApiResponse(responseCode = "404", description = "Пользователь не найден",
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ai.lab.inlive.exceptions.handler.ErrorResponse.class))),
+            @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера", content = @Content)
+    })
+    @DeleteMapping("/me")
+    public ResponseEntity<Void> deleteAccount() {
+        var token = (JwtAuthenticationToken) SecurityContextHolder.getContext().getAuthentication();
+        var keycloakId = Utils.extractIdFromToken(token);
+
+        userService.deleteUser(keycloakId);
+        return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+    }
 }
 

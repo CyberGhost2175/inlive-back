@@ -71,7 +71,7 @@ public class AccSearchRequestServiceImpl implements AccSearchRequestService {
                     messageSource.getMessage("services.searchRequest.invalidDates", null, LocaleContextHolder.getLocale()));
         }
 
-        var author = userRepository.findByKeycloakId(authorId)
+        var author = userRepository.findByKeycloakIdAndIsDeletedFalse(authorId)
                 .orElseThrow(() -> new DbObjectNotFoundException(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", 
                         messageSource.getMessage("services.searchRequest.userNotFound", 
                                 new Object[]{authorId}, LocaleContextHolder.getLocale())));
@@ -400,7 +400,7 @@ public class AccSearchRequestServiceImpl implements AccSearchRequestService {
     public Page<AccSearchRequestResponse> getMySearchRequests(String authorId, Pageable pageable) {
         log.info("Fetching search requests for user: {}", authorId);
 
-        var author = userRepository.findByKeycloakId(authorId)
+        var author = userRepository.findByKeycloakIdAndIsDeletedFalse(authorId)
                 .orElseThrow(() -> new DbObjectNotFoundException(HttpStatus.NOT_FOUND, "USER_NOT_FOUND",
                         messageSource.getMessage("services.searchRequest.userNotFound",
                                 new Object[]{authorId}, LocaleContextHolder.getLocale())));

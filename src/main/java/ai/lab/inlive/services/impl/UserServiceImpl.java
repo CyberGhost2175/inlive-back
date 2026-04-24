@@ -52,7 +52,7 @@ public class UserServiceImpl implements UserService {
     @Override
     public User getUserByKeycloakId(String keycloakId) {
         log.info("Retrieving user with keycloakId: {}", keycloakId);
-        return userRepository.findByKeycloakId(keycloakId)
+        return userRepository.findByKeycloakIdAndIsDeletedFalse(keycloakId)
                 .orElseThrow(() -> new DbObjectNotFoundException(HttpStatus.BAD_REQUEST, HttpStatus.BAD_REQUEST.getReasonPhrase(), messageSource.getMessage("error.user.notFound", null, LocaleContextHolder.getLocale())));
 
     }
@@ -147,7 +147,7 @@ public class UserServiceImpl implements UserService {
     public UserResponse getCurrentUser(String keycloakId) {
         log.info("Fetching current user info for keycloakId: {}", keycloakId);
 
-        User user = userRepository.findByKeycloakId(keycloakId)
+        User user = userRepository.findByKeycloakIdAndIsDeletedFalse(keycloakId)
                 .orElseThrow(() -> new DbObjectNotFoundException(HttpStatus.NOT_FOUND,
                         "USER_NOT_FOUND",
                         "User not found with Keycloak ID: " + keycloakId));
@@ -161,7 +161,7 @@ public class UserServiceImpl implements UserService {
     public void updateUserProfile(String keycloakId, UpdateUserProfileRequest request) {
         log.info("Updating user profile for keycloakId: {}", keycloakId);
 
-        User user = userRepository.findByKeycloakId(keycloakId)
+        User user = userRepository.findByKeycloakIdAndIsDeletedFalse(keycloakId)
                 .orElseThrow(() -> new DbObjectNotFoundException(HttpStatus.NOT_FOUND,
                         "USER_NOT_FOUND",
                         "User not found with Keycloak ID: " + keycloakId));
@@ -192,7 +192,7 @@ public class UserServiceImpl implements UserService {
     public void updateUserPhoto(String keycloakId, MultipartFile photo) {
         log.info("Updating profile photo for user with ID: {}", keycloakId);
 
-        var user = userRepository.findByKeycloakId(keycloakId)
+        var user = userRepository.findByKeycloakIdAndIsDeletedFalse(keycloakId)
                 .orElseThrow(() -> new DbObjectNotFoundException(
                         HttpStatus.NOT_FOUND,
                         "USER_NOT_FOUND",
@@ -221,7 +221,7 @@ public class UserServiceImpl implements UserService {
     public void deleteUserPhoto(String keycloakId) {
         log.info("Deleting photo for user with keycloakId: {}", keycloakId);
 
-        var user = userRepository.findByKeycloakId(keycloakId)
+        var user = userRepository.findByKeycloakIdAndIsDeletedFalse(keycloakId)
                 .orElseThrow(() -> new DbObjectNotFoundException(HttpStatus.NOT_FOUND,
                         "USER_NOT_FOUND",
                         "User not found with Keycloak ID: " + keycloakId));
@@ -236,6 +236,23 @@ public class UserServiceImpl implements UserService {
         userRepository.save(user);
 
         log.info("Successfully deleted photo for user: {}", keycloakId);
+    }
+
+    @Override
+    @Transactional
+    public void deleteUser(String keycloakId) {
+        log.info("User requesting account deletion, keycloakId: {}", keycloakId);
+
+        var user = userRepository.findByKeycloakIdAndIsDeletedFalse(keycloakId)
+                .orElseThrow(() -> new DbObjectNotFoundException(
+                        HttpStatus.NOT_FOUND,
+                        "USER_NOT_FOUND",
+                        "User not found with Keycloak ID: " + keycloakId));
+
+        user.softDelete();
+        userRepository.save(user);
+
+        log.info("Successfully soft-deleted user with keycloakId: {}", keycloakId);
     }
 
     private void deletePhotoFile(String filename) {

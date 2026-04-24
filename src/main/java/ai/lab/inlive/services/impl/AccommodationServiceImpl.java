@@ -69,7 +69,7 @@ public class AccommodationServiceImpl implements AccommodationService {
                 .orElseThrow(() -> new DbObjectNotFoundException(HttpStatus.NOT_FOUND, "DISTRICT_NOT_FOUND", 
                         messageSource.getMessage("services.accommodation.districtNotFound", 
                                 new Object[]{request.getDistrictId()}, LocaleContextHolder.getLocale())));
-        var owner = userRepository.findByKeycloakId(createdBy)
+        var owner = userRepository.findByKeycloakIdAndIsDeletedFalse(createdBy)
                 .orElseThrow(() -> new DbObjectNotFoundException(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", 
                         messageSource.getMessage("services.accommodation.userNotFound", 
                                 new Object[]{createdBy}, LocaleContextHolder.getLocale())));
@@ -385,7 +385,7 @@ public class AccommodationServiceImpl implements AccommodationService {
                         messageSource.getMessage("services.accommodation.notFound", 
                                 new Object[]{id}, LocaleContextHolder.getLocale())));
 
-        var approver = userRepository.findByKeycloakId(approvedBy)
+        var approver = userRepository.findByKeycloakIdAndIsDeletedFalse(approvedBy)
                 .orElseThrow(() -> new DbObjectNotFoundException(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", 
                         messageSource.getMessage("services.accommodation.userNotFound", 
                                 new Object[]{approvedBy}, LocaleContextHolder.getLocale())));
@@ -407,7 +407,7 @@ public class AccommodationServiceImpl implements AccommodationService {
                         messageSource.getMessage("services.accommodation.notFound", 
                                 new Object[]{id}, LocaleContextHolder.getLocale())));
 
-        var rejecter = userRepository.findByKeycloakId(rejectedBy)
+        var rejecter = userRepository.findByKeycloakIdAndIsDeletedFalse(rejectedBy)
                 .orElseThrow(() -> new DbObjectNotFoundException(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "User not found with Keycloak ID: " + rejectedBy));
 
         accommodation.setApproved(false);
@@ -422,7 +422,7 @@ public class AccommodationServiceImpl implements AccommodationService {
     public Page<AccommodationResponse> getAccommodationsByOwner(String ownerId, AccommodationSearchParams accommodationSearchParams, Pageable pageable) {
         log.info("Fetching accommodations for owner: {} with pagination", ownerId);
 
-        var owner = userRepository.findByKeycloakId(ownerId)
+        var owner = userRepository.findByKeycloakIdAndIsDeletedFalse(ownerId)
                 .orElseThrow(() -> new DbObjectNotFoundException(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "User not found with Keycloak ID: " + ownerId));
 
         var accommodations = accommodationRepository.findByOwnerIdWithFilters(owner.getId(), accommodationSearchParams, pageable);

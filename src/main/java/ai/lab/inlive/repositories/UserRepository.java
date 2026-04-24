@@ -8,7 +8,9 @@ import java.util.Optional;
 
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
-    Optional<User> findByKeycloakId(String id);
+    Optional<User> findByKeycloakIdAndIsDeletedFalse(String id);
 
     boolean existsByPhoneNumber(String phoneNumber);
+
+    Optional<User> findByIdAndIsDeletedFalse(Long id);
 }

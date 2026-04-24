@@ -19,4 +19,6 @@ public interface UserService {
     void updateUserPhoto(String keycloakId, MultipartFile photo);
 
     void deleteUserPhoto(String keycloakId);
+
+    void deleteUser(String keycloakId);
 }
