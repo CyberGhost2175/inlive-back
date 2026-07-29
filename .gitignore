@@ -35,3 +35,7 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### Firebase ###
+*firebase-adminsdk*.json
+uitap-com-firebase-adminsdk*.json

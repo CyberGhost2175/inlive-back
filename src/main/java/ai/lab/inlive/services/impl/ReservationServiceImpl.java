@@ -12,7 +12,9 @@ import ai.lab.inlive.exceptions.DbObjectNotFoundException;
 import ai.lab.inlive.exceptions.ForbiddenException;
 import ai.lab.inlive.mappers.ReservationMapper;
 import ai.lab.inlive.repositories.*;
+import ai.lab.inlive.services.PushNotificationService;
 import ai.lab.inlive.services.ReservationService;
+import ai.lab.inlive.services.push.PushMessageFactory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.MessageSource;
@@ -39,6 +41,8 @@ public class ReservationServiceImpl implements ReservationService {
     private final AccommodationRepository accommodationRepository;
     private final ReservationMapper reservationMapper;
     private final MessageSource messageSource;
+    private final PushNotificationService pushNotificationService;
+    private final PushMessageFactory pushMessageFactory;
 
     @Override
     @Transactional
@@ -77,6 +81,15 @@ public class ReservationServiceImpl implements ReservationService {
         reservationRepository.save(reservation);
         log.info("Successfully created reservation with ID: {} and status: {}",
                 reservation.getId(), reservation.getStatus());
+
+        Long clientUserId = reservation.getApprovedBy().getId();
+        Long ownerUserId = reservation.getUnit().getAccommodation().getOwnerId().getId();
+        pushNotificationService.sendToUser(
+                clientUserId,
+                pushMessageFactory.bookingCreatedForClient(reservation.getId()));
+        pushNotificationService.sendToUser(
+                ownerUserId,
+                pushMessageFactory.bookingWaitingToApprove(reservation.getId()));
     }
 
     @Override
@@ -120,6 +133,11 @@ public class ReservationServiceImpl implements ReservationService {
         reservationRepository.save(reservation);
         log.info("Successfully updated reservation with ID: {} to status: {}",
                 reservationId, request.getStatus());
+
+        Long clientUserId = reservation.getApprovedBy().getId();
+        pushNotificationService.sendToUser(
+                clientUserId,
+                pushMessageFactory.bookingStatusChanged(reservationId, request.getStatus()));
     }
 
     @Override
@@ -234,6 +252,11 @@ public class ReservationServiceImpl implements ReservationService {
         } else {
             log.info("Reservation {} marked as CLIENT_DIDNT_CAME - client did not show up", reservationId);
         }
+
+        Long clientUserId = reservation.getApprovedBy().getId();
+        pushNotificationService.sendToUser(
+                clientUserId,
+                pushMessageFactory.bookingStatusChanged(reservationId, request.getStatus()));
     }
 
     @Override
@@ -282,5 +305,10 @@ public class ReservationServiceImpl implements ReservationService {
         reservationRepository.save(reservation);
 
         log.info("Successfully cancelled reservation {} by client {}", reservationId, clientId);
+
+        Long ownerUserId = reservation.getUnit().getAccommodation().getOwnerId().getId();
+        pushNotificationService.sendToUser(
+                ownerUserId,
+                pushMessageFactory.bookingCanceled(reservationId));
     }
 }

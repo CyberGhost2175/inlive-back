@@ -32,6 +32,9 @@ RUN ./gradlew dependencies
 # Copy the source code and build the application
 COPY src src
 
+# Optional Firebase credentials for build-time packaging is not required;
+# at runtime mount/set FIREBASE_CREDENTIALS_PATH
+
 # Run Gradle with more logging to identify the errors
 RUN ./gradlew bootJar --info
 
@@ -44,6 +47,10 @@ RUN apk add --no-cache curl
 
 # Copy the built jar from the build stage
 COPY --from=build /app/build/libs/*.jar app.jar
+
+# Firebase credentials can be mounted at runtime, e.g.:
+#   -v ./uitap-com-firebase-adminsdk-fbsvc-0ce6fc1a67.json:/app/firebase-adminsdk.json
+#   -e FIREBASE_CREDENTIALS_PATH=/app/firebase-adminsdk.json
 
 # Set the entrypoint
 ENTRYPOINT ["java", "-Dvertx.disableDnsResolver=true", "-Djava.net.preferIPv4Stack=true", "-Xms4g","-Xmx4g","-XX:+UseG1GC", "-jar", "app.jar"]

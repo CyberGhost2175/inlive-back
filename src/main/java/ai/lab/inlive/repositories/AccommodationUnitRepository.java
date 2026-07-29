@@ -16,7 +16,8 @@ import java.util.Optional;
 public interface AccommodationUnitRepository extends JpaRepository<AccommodationUnit, Long> {
     
     @Query("SELECT DISTINCT au FROM AccommodationUnit au " +
-            "LEFT JOIN FETCH au.accommodation " +
+            "LEFT JOIN FETCH au.accommodation acc " +
+            "LEFT JOIN FETCH acc.ownerId " +
             "LEFT JOIN FETCH au.dictionaries d " +
             "LEFT JOIN FETCH d.dictionary " +
             "LEFT JOIN FETCH au.tariffs t " +
