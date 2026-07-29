@@ -15,6 +15,8 @@ import ai.lab.inlive.exceptions.ForbiddenException;
 import ai.lab.inlive.mappers.AccSearchRequestMapper;
 import ai.lab.inlive.repositories.*;
 import ai.lab.inlive.services.AccSearchRequestService;
+import ai.lab.inlive.services.PushNotificationService;
+import ai.lab.inlive.services.push.PushMessageFactory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.MessageSource;
@@ -51,6 +53,8 @@ public class AccSearchRequestServiceImpl implements AccSearchRequestService {
     private final AccommodationUnitMapper accommodationUnitMapper;
     private final ImageMapper imageMapper;
     private final MessageSource messageSource;
+    private final PushNotificationService pushNotificationService;
+    private final PushMessageFactory pushMessageFactory;
 
     @Override
     @Transactional
@@ -132,6 +136,9 @@ public class AccSearchRequestServiceImpl implements AccSearchRequestService {
             throw new IllegalArgumentException(failureReason);
         }
 
+        Set<Long> matchingOwnerIds = collectMatchingOwnerIds(
+                request, districts, services, conditions, checkInDateTime, checkOutDateTime);
+
         AccSearchRequest searchRequest = new AccSearchRequest();
         searchRequest.setAuthor(author);
         searchRequest.setFromDate(checkInDateTime);
@@ -185,6 +192,14 @@ public class AccSearchRequestServiceImpl implements AccSearchRequestService {
         saved = accSearchRequestRepository.save(saved);
 
         log.info("Successfully created search request with ID: {} for user: {}", saved.getId(), authorId);
+
+        if (!matchingOwnerIds.isEmpty()) {
+            pushNotificationService.sendToUsers(
+                    matchingOwnerIds,
+                    pushMessageFactory.newRelevantSearchRequest(saved.getId()));
+            log.info("Queued NEW_PRICE_REQUEST push for {} owner(s) of matching accommodations",
+                    matchingOwnerIds.size());
+        }
     }
 
     @Override
@@ -299,6 +314,83 @@ public class AccSearchRequestServiceImpl implements AccSearchRequestService {
         List<AccommodationUnitResponse> pageContent = (start >= result.size()) ? List.of() : result.subList(start, end);
 
         return new PageImpl<>(pageContent, pageable, result.size());
+    }
+
+    private Set<Long> collectMatchingOwnerIds(AccSearchRequestCreateRequest request,
+                                              List<District> districts,
+                                              List<Dictionary> services,
+                                              List<Dictionary> conditions,
+                                              LocalDateTime checkInDate,
+                                              LocalDateTime checkOutDate) {
+        Set<Long> districtIds = districts.stream()
+                .map(District::getId)
+                .collect(Collectors.toSet());
+        Set<Long> ownerIds = new HashSet<>();
+
+        for (AccommodationUnit unit : accommodationUnitRepository.findAll()) {
+            if (unit.getIsDeleted() || !unit.getIsAvailable()) {
+                continue;
+            }
+
+            Accommodation acc = unit.getAccommodation();
+            if (acc == null || Boolean.TRUE.equals(acc.getIsDeleted()) || acc.getOwnerId() == null) {
+                continue;
+            }
+
+            if (!request.getUnitTypes().contains(unit.getUnitType())) {
+                continue;
+            }
+            if (!districtIds.contains(acc.getDistrict().getId())) {
+                continue;
+            }
+            if (request.getFromRating() != null && acc.getRating() < request.getFromRating()) {
+                continue;
+            }
+            if (request.getToRating() != null && acc.getRating() > request.getToRating()) {
+                continue;
+            }
+            if (unit.getCapacity() < request.getCountOfPeople()) {
+                continue;
+            }
+
+            if (!services.isEmpty()) {
+                Set<Long> unitServiceIds = unit.getDictionaries().stream()
+                        .filter(d -> d.getDictionary().getKey() == DictionaryKey.ACC_SERVICE)
+                        .map(d -> d.getDictionary().getId())
+                        .collect(Collectors.toSet());
+                if (services.stream().anyMatch(s -> !unitServiceIds.contains(s.getId()))) {
+                    continue;
+                }
+            }
+
+            if (!conditions.isEmpty()) {
+                Set<Long> unitConditionIds = unit.getDictionaries().stream()
+                        .filter(d -> d.getDictionary().getKey() == DictionaryKey.ACC_CONDITION)
+                        .map(d -> d.getDictionary().getId())
+                        .collect(Collectors.toSet());
+                if (conditions.stream().anyMatch(c -> !unitConditionIds.contains(c.getId()))) {
+                    continue;
+                }
+            }
+
+            if (request.getPrice() != null && !unit.getTariffs().isEmpty()) {
+                Double minPrice = unit.getTariffs().stream()
+                        .map(AccUnitTariffs::getPrice)
+                        .min(Double::compareTo)
+                        .orElse(null);
+                if (minPrice != null && minPrice > request.getPrice()) {
+                    continue;
+                }
+            }
+
+            if (reservationRepository.isUnitReservedForPeriod(unit.getId(), checkInDate, checkOutDate)) {
+                continue;
+            }
+
+            ownerIds.add(acc.getOwnerId().getId());
+        }
+
+        return ownerIds;
     }
 
     private LocalDateTime calculateExpirationTime(LocalDateTime checkInDate) {

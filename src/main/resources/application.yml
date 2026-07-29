@@ -83,4 +83,8 @@ management:
       export:
         enabled: true
 
+firebase:
+  enabled: ${FIREBASE_ENABLED:true}
+  credentials-path: ${FIREBASE_CREDENTIALS_PATH:./uitap-com-firebase-adminsdk-fbsvc-0ce6fc1a67.json}
+
 

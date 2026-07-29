@@ -19,6 +19,8 @@ import ai.lab.inlive.repositories.AccommodationUnitRepository;
 import ai.lab.inlive.repositories.PriceRequestRepository;
 import ai.lab.inlive.repositories.ReservationRepository;
 import ai.lab.inlive.services.PriceRequestService;
+import ai.lab.inlive.services.PushNotificationService;
+import ai.lab.inlive.services.push.PushMessageFactory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.MessageSource;
@@ -40,6 +42,8 @@ public class PriceRequestServiceImpl implements PriceRequestService {
     private final PriceRequestMapper priceRequestMapper;
     private final ReservationRepository reservationRepository;
     private final MessageSource messageSource;
+    private final PushNotificationService pushNotificationService;
+    private final PushMessageFactory pushMessageFactory;
 
     @Override
     @Transactional
@@ -79,6 +83,11 @@ public class PriceRequestServiceImpl implements PriceRequestService {
 
         priceRequestRepository.save(priceRequest);
         log.info("Successfully created price request with ID: {}", priceRequest.getId());
+
+        Long clientUserId = searchRequest.getAuthor().getId();
+        pushNotificationService.sendToUser(
+                clientUserId,
+                pushMessageFactory.priceOfferCreated(priceRequest.getId(), priceRequest.getStatus()));
     }
 
     @Override
@@ -102,6 +111,11 @@ public class PriceRequestServiceImpl implements PriceRequestService {
 
         priceRequestRepository.save(priceRequest);
         log.info("Successfully updated price request with ID: {}", priceRequestId);
+
+        Long clientUserId = priceRequest.getSearchRequest().getAuthor().getId();
+        pushNotificationService.sendToUser(
+                clientUserId,
+                pushMessageFactory.priceOfferUpdated(priceRequest.getId(), priceRequest.getStatus()));
     }
 
     @Override
@@ -115,10 +129,16 @@ public class PriceRequestServiceImpl implements PriceRequestService {
                         messageSource.getMessage("services.priceRequest.notFound", 
                                 new Object[]{priceRequestId}, LocaleContextHolder.getLocale())));
 
+        Long clientUserId = priceRequest.getSearchRequest().getAuthor().getId();
+
         priceRequest.softDelete();
         priceRequestRepository.save(priceRequest);
 
         log.info("Successfully hidden price request with ID: {}", priceRequestId);
+
+        pushNotificationService.sendToUser(
+                clientUserId,
+                pushMessageFactory.priceRequestHidden(priceRequestId));
     }
 
     @Override
@@ -200,6 +220,10 @@ public class PriceRequestServiceImpl implements PriceRequestService {
 
         priceRequest.setClientResponseStatus(request.getClientResponseStatus());
 
+        Long ownerUserId = priceRequest.getUnit().getAccommodation().getOwnerId().getId();
+        Long clientUserId = searchRequest.getAuthor().getId();
+        Reservation createdReservation = null;
+
         if (request.getClientResponseStatus() == ClientResponseStatus.ACCEPTED) {
             if (reservationRepository.existsByPriceRequestId(priceRequestId)) {
                 log.warn("Reservation already exists for price request {}", priceRequestId);
@@ -212,7 +236,7 @@ public class PriceRequestServiceImpl implements PriceRequestService {
                 reservation.setStatus(ReservationStatus.WAITING_TO_APPROVE);
                 reservation.setNeedToPay(false);
 
-                reservationRepository.save(reservation);
+                createdReservation = reservationRepository.save(reservation);
                 log.info("Automatically created reservation with status WAITING_TO_APPROVE for price request {}", priceRequestId);
             }
 
@@ -223,5 +247,18 @@ public class PriceRequestServiceImpl implements PriceRequestService {
 
         priceRequestRepository.save(priceRequest);
         log.info("Successfully processed client response for price request {}", priceRequestId);
+
+        pushNotificationService.sendToUser(
+                ownerUserId,
+                pushMessageFactory.clientRespondedToPrice(priceRequestId, request.getClientResponseStatus()));
+
+        if (createdReservation != null) {
+            pushNotificationService.sendToUser(
+                    clientUserId,
+                    pushMessageFactory.bookingCreatedForClient(createdReservation.getId()));
+            pushNotificationService.sendToUser(
+                    ownerUserId,
+                    pushMessageFactory.bookingWaitingToApprove(createdReservation.getId()));
+        }
     }
 }

@@ -15,8 +15,10 @@ public interface PriceRequestRepository extends JpaRepository<PriceRequest, Long
     
     @Query("SELECT DISTINCT pr FROM PriceRequest pr " +
            "LEFT JOIN FETCH pr.unit u " +
-           "LEFT JOIN FETCH u.accommodation " +
-           "LEFT JOIN FETCH pr.searchRequest " +
+           "LEFT JOIN FETCH u.accommodation acc " +
+           "LEFT JOIN FETCH acc.ownerId " +
+           "LEFT JOIN FETCH pr.searchRequest sr " +
+           "LEFT JOIN FETCH sr.author " +
            "WHERE pr.id = :id AND pr.isDeleted = false")
     Optional<PriceRequest> findByIdAndIsDeletedFalse(Long id);
 
