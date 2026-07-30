@@ -15,6 +15,6 @@ public class DeviceTokenRegisterRequest {
     private String fcmToken;
 
     @NotNull(message = "{validation.deviceToken.platform.required}")
-  @Schema(description = "Платформа устройства", example = "web", allowableValues = {"ios", "android", "web"})
-  private DevicePlatform platform;
+    @Schema(description = "Платформа устройства", example = "web", allowableValues = {"ios", "android", "web"})
+    private DevicePlatform platform;
 }
