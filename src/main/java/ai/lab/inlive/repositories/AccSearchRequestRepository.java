@@ -254,4 +254,21 @@ public interface AccSearchRequestRepository extends JpaRepository<AccSearchReque
             """,
             nativeQuery = true)
     Page<AccSearchRequest> findRelevantRequestsForAccommodation(@Param("accommodationId") Long accommodationId, Pageable pageable);
+
+    @Query(value = """
+            SELECT asr.*
+            FROM acc_search_request asr
+            WHERE asr.is_deleted = FALSE
+              AND asr.status IN ('OPEN_TO_PRICE_REQUEST', 'PRICE_REQUEST_PENDING', 'WAIT_TO_RESERVATION')
+              AND asr.expires_at > EXTRACT(EPOCH FROM CURRENT_TIMESTAMP)::BIGINT
+            """,
+            countQuery = """
+            SELECT COUNT(*)
+            FROM acc_search_request asr
+            WHERE asr.is_deleted = FALSE
+              AND asr.status IN ('OPEN_TO_PRICE_REQUEST', 'PRICE_REQUEST_PENDING', 'WAIT_TO_RESERVATION')
+              AND asr.expires_at > EXTRACT(EPOCH FROM CURRENT_TIMESTAMP)::BIGINT
+            """,
+            nativeQuery = true)
+    Page<AccSearchRequest> findAllActiveForManagers(Pageable pageable);
 }

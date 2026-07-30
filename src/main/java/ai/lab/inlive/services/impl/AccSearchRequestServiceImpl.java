@@ -640,6 +640,35 @@ public class AccSearchRequestServiceImpl implements AccSearchRequestService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public Page<AccSearchRequestResponse> getAllSearchRequestsForManagers(Pageable pageable) {
+        log.info("Fetching all active search requests for managers");
+
+        Page<AccSearchRequest> requestsPage = accSearchRequestRepository.findAllActiveForManagers(pageable);
+        if (requestsPage.isEmpty()) {
+            return Page.empty(pageable);
+        }
+
+        List<Long> requestIds = requestsPage.getContent().stream()
+                .map(AccSearchRequest::getId)
+                .toList();
+
+        List<AccSearchRequest> requestsWithData = accSearchRequestRepository.findAllByIdInWithFetchJoin(requestIds);
+
+        // Keep page order (ORDER BY id DESC)
+        java.util.Map<Long, AccSearchRequest> byId = requestsWithData.stream()
+                .collect(Collectors.toMap(AccSearchRequest::getId, r -> r, (a, b) -> a));
+
+        List<AccSearchRequestResponse> responses = requestIds.stream()
+                .map(byId::get)
+                .filter(java.util.Objects::nonNull)
+                .map(accSearchRequestMapperImpl::toDto)
+                .toList();
+
+        return new PageImpl<>(responses, pageable, requestsPage.getTotalElements());
+    }
+
+    @Override
     @Transactional
     public void updateSearchRequestPrice(Long id, AccSearchRequestUpdatePriceRequest request, String authorId) {
         log.info("Updating price for search request ID: {} by user: {}", id, authorId);

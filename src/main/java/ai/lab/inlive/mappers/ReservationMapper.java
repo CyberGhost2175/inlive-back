@@ -11,6 +11,9 @@ public interface ReservationMapper {
 
     @Mapping(target = "clientId", source = "approvedBy.id")
     @Mapping(target = "clientName", expression = "java(getClientName(reservation))")
+    @Mapping(target = "clientFirstName", expression = "java(getClientFirstName(reservation))")
+    @Mapping(target = "clientLastName", expression = "java(getClientLastName(reservation))")
+    @Mapping(target = "clientPhoneNumber", expression = "java(getClientPhoneNumber(reservation))")
     @Mapping(target = "accommodationUnitId", source = "unit.id")
     @Mapping(target = "accommodationUnitName", source = "unit.name")
     @Mapping(target = "accommodationName", source = "unit.accommodation.name")
@@ -34,6 +37,21 @@ public interface ReservationMapper {
             return client.getFirstName() + " " + client.getLastName();
         }
         return client.getUsername();
+    }
+
+    default String getClientFirstName(Reservation reservation) {
+        if (reservation.getApprovedBy() == null) return null;
+        return reservation.getApprovedBy().getFirstName();
+    }
+
+    default String getClientLastName(Reservation reservation) {
+        if (reservation.getApprovedBy() == null) return null;
+        return reservation.getApprovedBy().getLastName();
+    }
+
+    default String getClientPhoneNumber(Reservation reservation) {
+        if (reservation.getApprovedBy() == null) return null;
+        return reservation.getApprovedBy().getPhoneNumber();
     }
 
     default String getManagerPhoneNumber(Reservation reservation) {

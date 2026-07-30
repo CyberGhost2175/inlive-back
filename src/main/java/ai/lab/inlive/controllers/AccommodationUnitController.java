@@ -1,5 +1,6 @@
 package ai.lab.inlive.controllers;
 
+import ai.lab.inlive.constants.Utils;
 import ai.lab.inlive.dto.base.PaginatedResponse;
 import ai.lab.inlive.dto.params.AccommodationUnitSearchParams;
 import ai.lab.inlive.dto.request.AccUnitDictionariesUpdateRequest;
@@ -31,6 +32,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -238,6 +241,23 @@ public class AccommodationUnitController {
         Page<AccSearchRequestResponse> response = accommodationUnitService.getRelevantRequests(unitId, pageable);
 
         return ResponseEntity.ok(new PaginatedResponse<>(response));
+    }
+
+    @AccessForAdminsAndSuperManagers
+    @Operation(summary = "Получить релевантные units владельца для заявки",
+            description = "Список units из всех размещений текущего SUPER_MANAGER, подходящих под заявку")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Список успешно получен"),
+            @ApiResponse(responseCode = "404", description = "Заявка не найдена", content = @Content),
+            @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера", content = @Content)
+    })
+    @GetMapping("/by-request/{requestId}")
+    public ResponseEntity<List<AccommodationUnitResponse>> getUnitsByRequestForOwner(
+            @Parameter(description = "ID заявки на поиск жилья", example = "1")
+            @PathVariable Long requestId) {
+        var token = (JwtAuthenticationToken) SecurityContextHolder.getContext().getAuthentication();
+        var ownerId = Utils.extractIdFromToken(token);
+        return ResponseEntity.ok(accommodationUnitService.getUnitsByRequestForOwner(ownerId, requestId));
     }
 
     @Operation(summary = "Получить релевантные единицы размещения для заявки",

@@ -7,6 +7,7 @@ import ai.lab.inlive.dto.request.AccSearchRequestUpdatePriceRequest;
 import ai.lab.inlive.dto.response.AccSearchRequestResponse;
 import ai.lab.inlive.dto.response.AccommodationUnitResponse;
 import ai.lab.inlive.security.authorization.AccessForAdminsAndClients;
+import ai.lab.inlive.security.authorization.AccessForAdminsAndSuperManagers;
 import ai.lab.inlive.services.AccSearchRequestService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -58,6 +59,31 @@ public class AccSearchRequestController {
 
         accSearchRequestService.createSearchRequest(request, authorId);
         return ResponseEntity.status(HttpStatus.CREATED).build();
+    }
+
+    @AccessForAdminsAndSuperManagers
+    @Operation(summary = "Получить все активные заявки (для SUPER_MANAGER)",
+            description = "Список всех активных заявок на поиск без фильтрации по конкретному размещению. " +
+                    "Включаются статусы OPEN_TO_PRICE_REQUEST, PRICE_REQUEST_PENDING, WAIT_TO_RESERVATION.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Список заявок успешно получен"),
+            @ApiResponse(responseCode = "401", description = "Пользователь не авторизован", content = @Content),
+            @ApiResponse(responseCode = "403", description = "Доступ запрещен", content = @Content),
+            @ApiResponse(responseCode = "500", description = "Внутренняя ошибка сервера", content = @Content)
+    })
+    @GetMapping("/all")
+    public ResponseEntity<PaginatedResponse<AccSearchRequestResponse>> getAllSearchRequestsForManagers(
+            @Parameter(description = "Номер страницы (начиная с 0)") @RequestParam(defaultValue = "0") Integer page,
+            @Parameter(description = "Размер страницы") @RequestParam(defaultValue = "20") Integer size,
+            @Parameter(description = "Поле для сортировки") @RequestParam(defaultValue = "id") String sortBy,
+            @Parameter(description = "Направление сортировки (asc/desc)") @RequestParam(defaultValue = "desc") String sortDirection) {
+        Pageable pageable = PageRequest.of(
+                page,
+                size,
+                Sort.by("desc".equalsIgnoreCase(sortDirection) ? Sort.Order.desc(sortBy) : Sort.Order.asc(sortBy))
+        );
+        Page<AccSearchRequestResponse> response = accSearchRequestService.getAllSearchRequestsForManagers(pageable);
+        return ResponseEntity.ok(new PaginatedResponse<>(response));
     }
 
     @AccessForAdminsAndClients
