@@ -16,6 +16,8 @@ public interface AccSearchRequestService {
 
     Page<AccSearchRequestResponse> getMySearchRequests(String authorId, Pageable pageable);
 
+    Page<AccSearchRequestResponse> getAllSearchRequestsForManagers(Pageable pageable);
+
     void updateSearchRequestPrice(Long id, AccSearchRequestUpdatePriceRequest request, String authorId);
 
     void cancelSearchRequest(Long id, String authorId);

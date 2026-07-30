@@ -14,8 +14,17 @@ public class ReservationResponse {
     @Schema(description = "ID клиента, подтвердившего бронь", example = "1")
     private Long clientId;
 
-    @Schema(description = "Имя клиента", example = "Иван Иванов")
+    @Schema(description = "Полное имя клиента", example = "Иван Иванов")
     private String clientName;
+
+    @Schema(description = "Имя клиента", example = "Иван")
+    private String clientFirstName;
+
+    @Schema(description = "Фамилия клиента", example = "Иванов")
+    private String clientLastName;
+
+    @Schema(description = "Номер телефона клиента", example = "+77001234567")
+    private String clientPhoneNumber;
 
     @Schema(description = "ID единицы размещения", example = "1")
     private Long accommodationUnitId;

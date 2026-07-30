@@ -461,6 +461,33 @@ public class AccommodationUnitServiceImpl implements AccommodationUnitService {
                 .collect(Collectors.toList());
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<AccommodationUnitResponse> getUnitsByRequestForOwner(String ownerKeycloakId, Long requestId) {
+        log.info("Fetching relevant units for owner {} and request {}", ownerKeycloakId, requestId);
+
+        AccSearchRequest searchRequest = accSearchRequestRepository.findByIdAndIsDeletedFalse(requestId)
+                .orElseThrow(() -> new DbObjectNotFoundException(HttpStatus.NOT_FOUND, "SEARCH_REQUEST_NOT_FOUND",
+                        messageSource.getMessage("services.accommodationUnit.searchRequestNotFound",
+                                new Object[]{requestId}, LocaleContextHolder.getLocale())));
+
+        List<AccommodationUnit> allUnits = accommodationUnitRepository.findAll().stream()
+                .filter(unit -> !Boolean.TRUE.equals(unit.getIsDeleted()))
+                .filter(unit -> {
+                    Accommodation acc = unit.getAccommodation();
+                    return acc != null
+                            && !Boolean.TRUE.equals(acc.getIsDeleted())
+                            && acc.getOwnerId() != null
+                            && ownerKeycloakId.equals(acc.getOwnerId().getKeycloakId());
+                })
+                .toList();
+
+        return allUnits.stream()
+                .filter(unit -> isUnitRelevantForRequest(unit, searchRequest))
+                .map(unit -> unitMapper.toDto(unit, imageMapper))
+                .collect(Collectors.toList());
+    }
+
     private boolean isUnitRelevantForRequest(AccommodationUnit unit, AccSearchRequest searchRequest) {
         Accommodation accommodation = unit.getAccommodation();
 

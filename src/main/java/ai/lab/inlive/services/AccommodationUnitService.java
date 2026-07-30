@@ -41,4 +41,6 @@ public interface AccommodationUnitService {
     Page<ReservationResponse> getUnitPendingReservations(Long unitId, Pageable pageable);
 
     List<AccommodationUnitResponse> getUnitsByAccommodationAndRequest(Long accommodationId, Long requestId);
+
+    List<AccommodationUnitResponse> getUnitsByRequestForOwner(String ownerKeycloakId, Long requestId);
 }

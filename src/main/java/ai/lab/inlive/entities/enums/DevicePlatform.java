@@ -5,7 +5,8 @@ import com.fasterxml.jackson.annotation.JsonValue;
 
 public enum DevicePlatform {
     IOS("ios"),
-    ANDROID("android");
+    ANDROID("android"),
+    WEB("web");
 
     private final String value;
 
